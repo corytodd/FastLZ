@@ -53,10 +53,19 @@
 #endif
 
 #if defined(FASTLZ_SAFE)
-#define FASTLZ_BOUND_CHECK(cond) \
-  if (FASTLZ_UNLIKELY(!(cond))) return 0;
+#define FASTLZ_BOUND_CHECK_OOB(cond) \
+  if (FASTLZ_UNLIKELY(!(cond))) return FASTLZ_ERROR_TOO_SMALL;
 #else
-#define FASTLZ_BOUND_CHECK(cond) \
+#define FASTLZ_BOUND_CHECK_OOB(cond) \
+  do {                           \
+  } while (0)
+#endif
+
+#if defined(FASTLZ_SAFE)
+#define FASTLZ_BOUND_CHECK_CORRUPT(cond) \
+  if (FASTLZ_UNLIKELY(!(cond))) return FASTLZ_ERROR_CORRUPT;
+#else
+#define FASTLZ_BOUND_CHECK_CORRUPT(cond) \
   do {                           \
   } while (0)
 #endif
@@ -346,19 +355,19 @@ int fastlz1_decompress(const void* input, int length, void* output, int maxout) 
       uint32_t ofs = (ctrl & 31) << 8;
       const uint8_t* ref = op - ofs - 1;
       if (len == 7 - 1) {
-        FASTLZ_BOUND_CHECK(ip <= ip_bound);
+        FASTLZ_BOUND_CHECK_CORRUPT(ip <= ip_bound);
         len += *ip++;
       }
       ref -= *ip++;
       len += 3;
-      FASTLZ_BOUND_CHECK(op + len <= op_limit);
-      FASTLZ_BOUND_CHECK(ref >= (uint8_t*)output);
+      FASTLZ_BOUND_CHECK_OOB(op + len <= op_limit);
+      FASTLZ_BOUND_CHECK_CORRUPT(ref >= (uint8_t*)output);
       fastlz_memmove(op, ref, len);
       op += len;
     } else {
       ctrl++;
-      FASTLZ_BOUND_CHECK(op + ctrl <= op_limit);
-      FASTLZ_BOUND_CHECK(ip + ctrl <= ip_limit);
+      FASTLZ_BOUND_CHECK_OOB(op + ctrl <= op_limit);
+      FASTLZ_BOUND_CHECK_CORRUPT(ip + ctrl <= ip_limit);
       fastlz_memcpy(op, ip, ctrl);
       ip += ctrl;
       op += ctrl;
@@ -494,7 +503,7 @@ int fastlz2_decompress(const void* input, int length, void* output, int maxout) 
 
       uint8_t code;
       if (len == 7 - 1) do {
-          FASTLZ_BOUND_CHECK(ip <= ip_bound);
+          FASTLZ_BOUND_CHECK_CORRUPT(ip <= ip_bound);
           code = *ip++;
           len += code;
         } while (code == 255);
@@ -505,20 +514,20 @@ int fastlz2_decompress(const void* input, int length, void* output, int maxout) 
       /* match from 16-bit distance */
       if (FASTLZ_UNLIKELY(code == 255))
         if (FASTLZ_LIKELY(ofs == (31 << 8))) {
-          FASTLZ_BOUND_CHECK(ip < ip_bound);
+          FASTLZ_BOUND_CHECK_CORRUPT(ip < ip_bound);
           ofs = (*ip++) << 8;
           ofs += *ip++;
           ref = op - ofs - MAX_L2_DISTANCE - 1;
         }
 
-      FASTLZ_BOUND_CHECK(op + len <= op_limit);
-      FASTLZ_BOUND_CHECK(ref >= (uint8_t*)output);
+      FASTLZ_BOUND_CHECK_OOB(op + len <= op_limit);
+      FASTLZ_BOUND_CHECK_CORRUPT(ref >= (uint8_t*)output);
       fastlz_memmove(op, ref, len);
       op += len;
     } else {
       ctrl++;
-      FASTLZ_BOUND_CHECK(op + ctrl <= op_limit);
-      FASTLZ_BOUND_CHECK(ip + ctrl <= ip_limit);
+      FASTLZ_BOUND_CHECK_OOB(op + ctrl <= op_limit);
+      FASTLZ_BOUND_CHECK_CORRUPT(ip + ctrl <= ip_limit);
       fastlz_memcpy(op, ip, ctrl);
       ip += ctrl;
       op += ctrl;
@@ -547,12 +556,12 @@ int fastlz_decompress(const void* input, int length, void* output, int maxout) {
   if (level == 2) return fastlz2_decompress(input, length, output, maxout);
 
   /* unknown level, trigger error */
-  return 0;
+  return FASTLZ_ERROR_UNKNOWN_LEVEL;
 }
 
 int fastlz_compress_level(int level, const void* input, int length, void* output) {
   if (level == 1) return fastlz1_compress(input, length, output);
   if (level == 2) return fastlz2_compress(input, length, output);
 
-  return 0;
+  return FASTLZ_ERROR_UNKNOWN_LEVEL;
 }

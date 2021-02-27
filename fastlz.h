@@ -108,18 +108,6 @@ int fastlz_compress_level(int level, const void* input, int length, void* output
  */
 int fastlz_decompress(const void* input, int length, void* output, int maxout);
 
-/**
-  DEPRECATED.
-
-  This is similar to fastlz_compress_level above, but with the level
-  automatically chosen.
-
-  This function is deprecated and it will be completely removed in some future
-  version.
-*/
-
-int fastlz_compress(const void* input, int length, void* output);
-
 #if defined(__cplusplus)
 }
 #endif
